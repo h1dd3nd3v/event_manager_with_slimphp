@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Models\StripeEventsModel;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Stripe\StripeClient;
@@ -99,6 +100,20 @@ class StripeController
                 throw new \RuntimeException('Stripe did not return a Checkout URL.');
             }
 
+            try {
+                StripeEventsModel::logCheckoutSession($session);
+            } catch (Throwable $error) {
+                error_log(
+                    'Stripe Checkout session was created but could not be logged: '
+                    . get_class($error) . ': ' . $error->getMessage()
+                );
+
+                return $this->jsonResponse($response, [
+                    'error' => 'Checkout was created, but its record could not be saved.',
+                    'session_id' => $session->id,
+                ], 500);
+            }
+
             return $this->jsonResponse($response, ['url' => $session->url]);
         } catch (Throwable $error) {
             error_log(
@@ -127,34 +142,91 @@ class StripeController
             ], 400);
         }
 
-        $secretKey = $_ENV['STRIPE_SECRET_KEY'];
-
-        if ($secretKey === '') {
-            error_log('Stripe Checkout verification is missing STRIPE_SECRET_KEY.');
-            return $this->jsonResponse($response, [
-                'error' => 'Missing required environment variable: STRIPE_SECRET_KEY.',
-            ], 500);
-        }
-
         try {
-            $stripe = new StripeClient($secretKey);
-            $session = $stripe->checkout->sessions->retrieve($sessionId);
+            $event = StripeEventsModel::query()
+                ->where('checkout_session_id', $sessionId)
+                ->first();
+
+            if ($event === null) {
+                return $this->jsonResponse($response, [
+                    'error' => 'No saved record was found for this Checkout Session.',
+                ], 404);
+            }
 
             return $this->jsonResponse($response, [
-                'status' => $session->status,
-                'paymentStatus' => $session->payment_status,
+                'sessionId' => $event->checkout_session_id,
+                'status' => $event->payload['status'] ?? null,
+                'paymentStatus' => $event->payment_status,
+                'amountTotal' => $event->amount_total,
+                'currency' => $event->currency,
             ]);
         } catch (Throwable $error) {
             error_log(
-                'Failed to verify Stripe Checkout session: '
+                'Failed to read Stripe Checkout session record: '
                 . get_class($error) . ': ' . $error->getMessage()
             );
-            return $this->stripeErrorResponse(
-                $response,
-                'Unable to retrieve the Stripe Checkout session.',
-                $error
-            );
+            return $this->jsonResponse($response, [
+                'error' => 'Unable to read the Checkout Session record.',
+            ], 500);
         }
+    }
+
+    public function checkout_events(Request $request, Response $response): Response
+    {
+        $query = $request->getQueryParams();
+        $page = $this->positiveInteger($query['page'] ?? null, 1);
+        $perPage = min($this->positiveInteger($query['per_page'] ?? null, 20), 100);
+
+        try {
+            $events = StripeEventsModel::query()
+                ->select([
+                    'id',
+                    'stripe_event_id',
+                    'type',
+                    'livemode',
+                    'checkout_session_id',
+                    'payment_intent_id',
+                    'amount_total',
+                    'currency',
+                    'payment_status',
+                    'stripe_created_at',
+                    'processing_status',
+                ])
+                ->whereNotNull('checkout_session_id')
+                ->orderByDesc('stripe_created_at')
+                ->paginate($perPage, ['*'], 'page', $page);
+
+            return $this->jsonResponse($response, [
+                'data' => $events->items(),
+                'pagination' => [
+                    'currentPage' => $events->currentPage(),
+                    'perPage' => $events->perPage(),
+                    'total' => $events->total(),
+                    'lastPage' => $events->lastPage(),
+                ],
+            ]);
+        } catch (Throwable $error) {
+            error_log(
+                'Failed to read Stripe Checkout event records: '
+                . get_class($error) . ': ' . $error->getMessage()
+            );
+            return $this->jsonResponse($response, [
+                'error' => 'Unable to read Checkout event records.',
+            ], 500);
+        }
+    }
+
+    private function positiveInteger($value, int $default): int
+    {
+        if (!is_string($value) && !is_int($value)) {
+            return $default;
+        }
+
+        $validated = filter_var($value, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+
+        return $validated === false ? $default : $validated;
     }
 
     private function stripeErrorResponse(

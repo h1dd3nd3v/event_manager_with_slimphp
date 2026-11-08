@@ -12,5 +12,6 @@ return function (App $app): void {
     $app->group('/checkout', function (RouteCollectorProxy $group): void {
         $group->post('/create-checkout-session', [StripeController::class, 'create_checkout_session']);
         $group->get('/checkout-session', [StripeController::class, 'checkout_session']);
+        $group->get('/checkout-events', [StripeController::class, 'checkout_events']);
     });
 };
