@@ -67,10 +67,6 @@ class EventsController
             return $response->withHeader("Content-Type", "application/json")->withStatus(400);
         }
 
-        // if (isset($uploadedFiles['image'])) {
-        //     $userDetails['photo_url'] = $utilityFunctions->uploadImage($uploadedFiles['image']);
-        // }
-
         $image_utilities = new ImageUtilities;
 
         if (isset($uploaded_file['title_image'])) {
@@ -210,8 +206,6 @@ class EventsController
                 ->withStatus(500);
         }
     }
-
-    // write a function to update events and event images
     public function update_event_details(Request $request, Response $response, array $args)
     {
         $form_data = $request->getParsedBody();
@@ -300,6 +294,56 @@ class EventsController
             ]));
             return $response->withHeader("Content-Type", "application/json")->withStatus(200);
 
+        } catch (Exception $e) {
+            $response->getBody()->write(json_encode([
+                "errors" => true,
+                "message" => $e->getMessage()
+            ]));
+            return $response->withHeader("Content-Type", "application/json")->withStatus(400);
+        }
+    }
+
+    public function update_event_image(Request $request, Response $response, array $args)
+    {
+        $form_data = $request->getParsedBody();
+
+        $event_id = $args['event_id'] ?? '';
+
+        if (!filter_var($event_id, FILTER_VALIDATE_INT) || $event_id <= 0) {
+            $response->getBody()->write(json_encode([
+                "errors" => true,
+                "message" => "Invalid event ID."
+            ]));
+
+            return $response->withHeader("Content-Type", "application/json")
+                ->withStatus(400);
+        }
+
+        $uploaded_file = $request->getUploadedFiles();
+
+        $image_utilities = new ImageUtilities;
+
+        if (isset($uploaded_file['title_image'])) {
+            $title_image_link = $image_utilities->upload_image($uploaded_file['title_image']);
+        }
+
+        try {
+            $event = EventsModel::find($event_id);
+
+            if (!$event) {
+                throw new Exception("Event not found");
+            }
+
+            EventsModel::where("id", "=", $event_id)
+                ->update([
+                    "title_image_link" => $title_image_link
+                ]);
+
+            $response->getBody()->write(json_encode([
+                "success" => true,
+                "message" => "Event updated successfully"
+            ]));
+            return $response->withHeader("Content-Type", "application/json")->withStatus(200);
         } catch (Exception $e) {
             $response->getBody()->write(json_encode([
                 "errors" => true,

@@ -16,5 +16,6 @@ return function (App $app) {
         $group->get('/{event_id}', [EventsController::class, 'get_event']);
         $group->delete('/{event_id}', [EventsController::class, 'delete_event']);
         $group->post('/{event_id}', [EventsController::class, 'update_event_details']);
+        $group->post('/image/{event_id}', [EventsController::class, 'update_event_image']);
     });
 };
