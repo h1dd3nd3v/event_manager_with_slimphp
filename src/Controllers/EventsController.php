@@ -9,12 +9,15 @@ use DateTime;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Exception;
+use App\Utilities\ImageUtilities;
 
 class EventsController
 {
     public function create_event(Request $request, Response $response)
     {
         $form_data = $request->getParsedBody();
+
+        $uploaded_file = $request->getUploadedFiles();
 
         $event_name = trim($form_data['event_name'] ?? '');
         $start_date_input = $form_data['start_date'] ?? '';
@@ -64,6 +67,16 @@ class EventsController
             return $response->withHeader("Content-Type", "application/json")->withStatus(400);
         }
 
+        // if (isset($uploadedFiles['image'])) {
+        //     $userDetails['photo_url'] = $utilityFunctions->uploadImage($uploadedFiles['image']);
+        // }
+
+        $image_utilities = new ImageUtilities;
+
+        if (isset($uploaded_file['title_image'])) {
+            $title_image_link = $image_utilities->upload_image($uploaded_file['title_image']);
+        }
+
         try {
             // create the event
             // write a function to check an image and then upload the image to cloudinary
@@ -74,7 +87,7 @@ class EventsController
                 "location" => $location,
                 "event_registrati on_link" => $event_registration_link,
                 "event_created_by" => $event_created_by,
-                "title_image_link" => "https://www.google.com"
+                "title_image_link" => $title_image_link
             ]);
 
             $response->getBody()->write(json_encode([
