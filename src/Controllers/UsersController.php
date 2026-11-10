@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\UsersModel;
+use App\Utilities\JwtToken;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Exception;
@@ -70,6 +71,12 @@ class UsersController
                 throw new Exception("Username is unavailable");
             }
 
+            $email_check = $this->check_email($email);
+
+            if ($email_check == true) {
+                throw new Exception("Email not available");
+            }
+
             UsersModel::create([
                 'username' => $username,
                 'email' => $email,
@@ -113,38 +120,29 @@ class UsersController
             return $response->withHeader("Content-Type", "application/json")->withStatus(400);
         }
 
-        try {
-            $username_check = $this->check_username($username);
+        $user = UsersModel::where('username', '=', $username)->first();
 
-            if ($username_check == false) {
-                throw new Exception("Username does not exist, contact administrator for assistance");
-            }
-
-            // password checking logic
-            $returned_password = UsersModel::select('password')->where('username', '=', $username)->first();
-
-            if (!password_verify($password, $returned_password['password'])) {
-                throw new Exception("Incorrect password. Contact administrator for assistance");
-            }
-
-            $response->getBody()->write(json_encode([
-                "success" => true,
-                "message" => "Log in successful"
-            ]));
-            return $response->withHeader("Content-Type", "application/json")->withStatus(200);
-
-            // I need to include the jwt tokens and everything later
-        } catch (Exception $e) {
+        if ($user === null || !password_verify($password, $user->password)) {
             $response->getBody()->write(json_encode([
                 "errors" => true,
-                "message" => $e->getMessage()
+                "message" => "Invalid username or password"
             ]));
-            return $response->withHeader("Content-Type", "application/json")->withStatus(400);
+            return $response->withHeader("Content-Type", "application/json")->withStatus(401);
         }
+
+        $response->getBody()->write(json_encode([
+            "success" => true,
+            "message" => "Log in successful",
+            "access_token" => JwtToken::issueForUsername($user->username),
+            "token_type" => "Bearer",
+            "expires_in" => JwtToken::LIFETIME_SECONDS
+        ]));
+        return $response->withHeader("Content-Type", "application/json")->withStatus(200);
     }
 
-    public function update_password (Request $request, Response $response) {
-        
+    public function update_password(Request $request, Response $response)
+    {
+
     }
 
     private function check_username(string $username)
@@ -152,6 +150,21 @@ class UsersController
         // check the database for the username
         try {
             $user_data = UsersModel::select('username')->where('username', '=', $username)->first();
+
+            if ($user_data == null) {
+                return false;
+            }
+
+            return true;
+        } catch (Exception $e) {
+            return $e->getMessage();
+        }
+    }
+
+    private function check_email(string $email)
+    {
+        try {
+            $user_data = UsersModel::select('email')->where('email', '=', $email)->first();
 
             if ($user_data == null) {
                 return false;

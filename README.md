@@ -22,8 +22,7 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
 2. Create a `.env` file in the project root. Do not commit this file or put real credentials in documentation.
 
    ```dotenv
-   AUTH_JWT_SECRET=replace-with-a-long-random-secret
-   AUTH_JWT_TTL=3600
+   AUTH_JWT_SECRET=replace-with-at-least-32-random-bytes
 
    DB_DRIVER=mysql
    DB_HOST=127.0.0.1
@@ -66,7 +65,7 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
 | `DOMAIN` | Checkout success and cancellation URL base |
 | `APP_DEBUG` | When true, includes Stripe exception details in Stripe error responses |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Event image upload configuration |
-| `AUTH_JWT_SECRET`, `AUTH_JWT_TTL` | Authentication-related configuration; login currently does not issue a JWT |
+| `AUTH_JWT_SECRET` | HS256 signing key for 24-hour login tokens and authentication middleware; use at least 32 random bytes |
 
 ## API
 
@@ -77,7 +76,7 @@ All request and response bodies are JSON except event image uploads, which use `
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/users` | Register a user. The request expects `first_name`, `last_name`, `username`, `email`, and `password`. |
-| `POST` | `/users/login` | Check a username and password. |
+| `POST` | `/users/login` | Check a username and password; returns an `access_token`, `token_type` (`Bearer`), and `expires_in` (seconds). |
 
 ### Events
 
@@ -103,6 +102,7 @@ The checkout log uses an internal identifier in the form `checkout_session_<sess
 ## Runtime notes
 
 - CORS origins are currently configured in `public/index.php`; update the allow list for the frontend’s deployed origin.
+- Send login tokens in the `Authorization: Bearer <token>` header. `AuthMiddleware` verifies the token and attaches the matching user model to the request as the `user` attribute; routes are not protected by it until it is explicitly added to their route groups.
 - The Stripe checkout read endpoints do not currently use authentication middleware. Restrict access at the application or web-server layer before exposing sensitive operational data.
 - PHP errors and Stripe integration failures are written to the server error log.
 - Route definitions are in `src/Routes/`; controllers are in `src/Controllers/`; Eloquent models are in `src/Models/`.

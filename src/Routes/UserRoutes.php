@@ -11,7 +11,8 @@ use Slim\Routing\RouteCollectorProxy;
 
 return function (App $app) {
     $app->group('/users', function (RouteCollectorProxy $group) {
-        $group->post('', [UsersController::class, 'create_user']);
+        $group->post('', [UsersController::class, 'create_user'])
+            ->add(new AuthMiddleware());
         $group->post('/login', [UsersController::class, 'login_user']);
     });
 };
