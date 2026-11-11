@@ -3,6 +3,8 @@ services:
     name: event-manager-api
     runtime: docker
     plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /
     envVars:
       - key: AUTH_JWT_SECRET
