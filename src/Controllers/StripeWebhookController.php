@@ -39,9 +39,16 @@ class StripeWebhookController
 
         try {
             $event = Webhook::constructEvent($payload, $signature, $secret);
-        } catch (UnexpectedValueException | SignatureVerificationException $error) {
+        } catch (SignatureVerificationException $error) {
             error_log('Rejected Stripe webhook: ' . $error->getMessage());
-            return $this->jsonResponse($response, ['error' => 'Invalid webhook signature or payload.'], 400);
+            return $this->jsonResponse($response, [
+                'error' => 'Invalid webhook signature. Check that STRIPE_WEBHOOK_SECRET belongs to the Stripe endpoint and mode that sent this request.',
+            ], 400);
+        } catch (UnexpectedValueException $error) {
+            error_log('Rejected Stripe webhook payload: ' . $error->getMessage());
+            return $this->jsonResponse($response, [
+                'error' => 'Invalid or unsupported Stripe webhook payload.',
+            ], 400);
         }
 
         if (!in_array($event->type, self::HANDLED_EVENTS, true)) {
