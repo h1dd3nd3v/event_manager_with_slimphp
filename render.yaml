@@ -35,6 +35,12 @@ services:
         sync: false
       - key: STRIPE_PRICE_ID
         sync: false
+      - key: STRIPE_EBOOK_PRICE_ID
+        sync: false
+      - key: STRIPE_HARDCOVER_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       - key: DOMAIN
         sync: false
       - key: APP_DEBUG

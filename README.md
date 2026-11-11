@@ -39,6 +39,9 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
 
    STRIPE_SECRET_KEY=sk_test_replace_me
    STRIPE_PRICE_ID=price_replace_me
+   STRIPE_EBOOK_PRICE_ID=price_replace_me
+   STRIPE_HARDCOVER_PRICE_ID=price_replace_me
+   STRIPE_WEBHOOK_SECRET=whsec_replace_me
    DOMAIN=http://localhost:5173
    APP_DEBUG=false
    ```
@@ -50,8 +53,9 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
    - `users`: `id`, `username`, `email`, `password`, `created_at`, and `updated_at`.
    - `events`: `id`, `event_name`, `start_date`, `end_date`, `location`, `event_registration_link`, `event_created_by`, `event_updated_by`, `title_image_link`, `created_at`, and `updated_at`.
    - `stripe_events`: use the Stripe event-log table definition for this project. It must include the fields used by `StripeEventsModel`, including a unique `stripe_event_id`, `checkout_session_id`, `payment_status`, `payload` (JSON), `stripe_created_at`, `processing_status`, `processed_at`, and `attempts`. The model disables Eloquent timestamps, so `created_at` and `updated_at` are not required for this table.
+   - `orders`: execute [`database/orders.sql`](./database/orders.sql) once to create the book order table.
 
-   Database schema creation is not currently automated by migrations. Ensure the `stripe_events` table exists before creating or reading Checkout sessions.
+   Database schema creation is not automated by migrations. Ensure the `stripe_events` and `orders` tables exist before using checkout or order endpoints.
 
 4. Configure the web server to route requests to `public/index.php`. The project includes a root `.htaccess` that forwards requests into `public/`; enable Apache rewrite support and confirm the hosting document-root configuration matches your deployment.
 
@@ -66,7 +70,7 @@ docker build -t event-manager-api .
 docker run --rm --env-file .env -p 10000:10000 -e PORT=10000 event-manager-api
 ```
 
-For Render, create a Blueprint from this repository using `render.yaml`. Set the prompted database, authentication, Stripe, Cloudinary, and `DOMAIN` values in Render's environment settings. The app expects a reachable MySQL database; Render's managed database offering is PostgreSQL, so provide an external MySQL-compatible database and create the tables described above before using the API. Update the CORS allow list in `public/index.php` to include the deployed frontend origin.
+For Render, create a Blueprint from this repository using `render.yaml`. Set the prompted database, authentication, Stripe, Cloudinary, and `DOMAIN` values in Render's environment settings. Use live Stripe Price IDs for the book's ebook and hardcover prices and the live webhook signing secret for the configured webhook endpoint. The app expects a reachable MySQL database; Render's managed database offering is PostgreSQL, so provide an external MySQL-compatible database and create the tables described above before using the API. Update the CORS allow list in `public/index.php` to include the deployed frontend origin.
 
 ## Environment variables
 
@@ -75,6 +79,8 @@ For Render, create a Blueprint from this repository using `render.yaml`. Set the
 | `DB_DRIVER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_CHARSET`, `DB_COLLATION` | Database connection configured in `src/database.php` |
 | `STRIPE_SECRET_KEY` | Stripe API requests |
 | `STRIPE_PRICE_ID` | The Price used to create each Checkout session |
+| `STRIPE_EBOOK_PRICE_ID`, `STRIPE_HARDCOVER_PRICE_ID` | Stripe Price IDs for the book's ebook and hardcover options |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for the Stripe webhook endpoint; keep it private |
 | `DOMAIN` | Checkout success and cancellation URL base |
 | `APP_DEBUG` | When true, includes Stripe exception details in Stripe error responses |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Event image upload configuration |
@@ -109,6 +115,22 @@ All request and response bodies are JSON except event image uploads, which use `
 | `POST` | `/checkout/create-checkout-session` | Create a one-time Stripe Checkout session, save its snapshot in `stripe_events`, and return `{ "url": "..." }`. |
 | `GET` | `/checkout/checkout-session?session_id=cs_test_...` | Read a saved Checkout Session by ID. Returns status, payment status, amount, and currency. Returns `404` if no saved record exists. |
 | `GET` | `/checkout/checkout-events?page=1&per_page=20` | Return paginated Checkout records, excluding the raw Stripe payload and customer email. `per_page` defaults to 20 and is capped at 100. |
+| `POST` | `/checkout/webhook` | Receive and verify Stripe Checkout payment events. Configure Stripe to send `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired` to this endpoint. |
+
+### Book orders
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/orders` | Create a guest order and Stripe Checkout session. JSON body: `{ "format": "ebook" }` or `{ "format": "hardcover" }`. Returns `orderId`, `sessionId`, and the Checkout `url`. Hardcover checkout collects a shipping address using the existing allowed-country list; shipping is included in the configured Stripe Price. |
+| `GET` | `/orders?page=1&per_page=20` | List orders. Requires a login token. |
+| `GET` | `/orders/{order_id}` | Retrieve an order. Requires a login token. |
+| `PATCH` | `/orders/{order_id}/fulfillment` | Set `{ "fulfillment_status": "processing" }`, `"shipped"`, or `"fulfilled"` after payment. Requires a login token. |
+
+Order payment status is set to `paid` only after a verified Stripe webhook confirms payment. E-book fulfillment is manual and can be marked `fulfilled`; hardcover orders can be marked `processing`, `shipped`, then `fulfilled`.
+
+The current order-management routes use the existing JWT middleware, so **any authenticated account can list and manage all orders**. This includes customer email and shipping-address data. Restrict these routes to administrators before production use.
+
+In Stripe Dashboard, create a live-mode webhook endpoint at `https://event-manager-with-slimphp.onrender.com/checkout/webhook`, select the four events above, and set its signing secret as `STRIPE_WEBHOOK_SECRET` in Render. Do not use the webhook signing secret in the browser or commit it to the repository.
 
 The checkout log uses an internal identifier in the form `checkout_session_<session_id>` for the unique `stripe_event_id` column. These records are snapshots created by this application; they are not Stripe webhook events. The Checkout Session lookup reads the database and does not refresh the data from Stripe.
 
