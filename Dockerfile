@@ -7,17 +7,17 @@ RUN apt-get update \
     && docker-php-ext-install -j"$(nproc)" curl pdo_mysql \
     && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get install -y \
+    git unzip libzip-dev libicu-dev libpng-dev libonig-dev \
+    && docker-php-ext-install zip intl gd bcmath pdo_mysql mbstring \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
-RUN composer install \
-    --no-dev \
-    --no-interaction \
-    --no-progress \
-    --prefer-dist \
-    --optimize-autoloader
+RUN composer install 
 
 COPY . .
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
