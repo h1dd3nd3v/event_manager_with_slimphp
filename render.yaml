@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: event-manager-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: AUTH_JWT_SECRET
+        sync: false
+      - key: DB_DRIVER
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_CHARSET
+        value: utf8mb4
+      - key: DB_COLLATION
+        value: utf8mb4_unicode_ci
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: DOMAIN
+        sync: false
+      - key: APP_DEBUG
+        value: "false"

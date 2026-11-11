@@ -10,7 +10,7 @@ use Tuupola\Middleware\CorsMiddleware;
 require __DIR__ . '/../vendor/autoload.php';
 
 $dotenv = Dotenv::createImmutable(__DIR__ . '/../');
-$dotenv->load();
+$dotenv->safeLoad();
 
 $app = AppFactory::create();
 

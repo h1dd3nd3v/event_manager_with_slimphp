@@ -55,6 +55,19 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
 
 4. Configure the web server to route requests to `public/index.php`. The project includes a root `.htaccess` that forwards requests into `public/`; enable Apache rewrite support and confirm the hosting document-root configuration matches your deployment.
 
+## Docker and Render
+
+The Docker image uses PHP 8.3 with Apache and `pdo_mysql`. It serves the Slim app from `public/` and listens on Render's `PORT` (defaulting to `10000` for local runs).
+
+To build and run locally, first create a `.env` file using the setup example above:
+
+```sh
+docker build -t event-manager-api .
+docker run --rm --env-file .env -p 10000:10000 -e PORT=10000 event-manager-api
+```
+
+For Render, create a Blueprint from this repository using `render.yaml`. Set the prompted database, authentication, Stripe, Cloudinary, and `DOMAIN` values in Render's environment settings. The app expects a reachable MySQL database; Render's managed database offering is PostgreSQL, so provide an external MySQL-compatible database and create the tables described above before using the API. Update the CORS allow list in `public/index.php` to include the deployed frontend origin.
+
 ## Environment variables
 
 | Variable | Used for |
