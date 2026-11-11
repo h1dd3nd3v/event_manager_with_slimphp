@@ -57,7 +57,7 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
 
 ## Docker and Render
 
-The Docker image uses PHP 8.3 with Apache and `pdo_mysql`. It serves the Slim app from `public/` and listens on Render's `PORT` (defaulting to `10000` for local runs).
+The Docker image uses PHP 8.4 with Apache and `pdo_mysql`. It serves the Slim app from `public/` and listens on Render's `PORT` (defaulting to `10000` for local runs).
 
 To build and run locally, first create a `.env` file using the setup example above:
 
