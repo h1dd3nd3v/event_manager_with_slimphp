@@ -120,7 +120,10 @@ class StripeWebhookController
                         return ['status' => 200];
                     }
 
-                    $order = OrdersModel::query()->whereKey($orderId)->lockForUpdate()->first();
+                    $order = OrdersModel::query()
+                        ->where('order_id', $orderId)
+                        ->lockForUpdate()
+                        ->first();
                     if ($order === null) {
                         $eventRecord->processing_status = 'failed';
                         $eventRecord->error_message = 'Order referenced by the Checkout Session was not found.';

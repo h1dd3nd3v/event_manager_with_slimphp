@@ -167,7 +167,7 @@ class OrdersController
         }
 
         try {
-            $order = OrdersModel::find($orderId);
+            $order = OrdersModel::query()->where('order_id', $orderId)->first();
             if ($order === null) {
                 return $this->jsonResponse($response, ['error' => 'Order not found.'], 404);
             }
@@ -202,7 +202,7 @@ class OrdersController
         }
 
         try {
-            $order = OrdersModel::find($orderId);
+            $order = OrdersModel::query()->where('order_id', $orderId)->first();
             if ($order === null) {
                 return $this->jsonResponse($response, ['error' => 'Order not found.'], 404);
             }

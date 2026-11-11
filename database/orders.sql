@@ -1,4 +1,5 @@
 CREATE TABLE orders (
+    id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     order_id            CHAR(32)       NOT NULL,
     product_name        VARCHAR(255)   NOT NULL,
     product_format      ENUM('ebook', 'hardcover') NOT NULL,
@@ -12,7 +13,8 @@ CREATE TABLE orders (
     shipping_address    JSON           NULL,
     created_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (order_id),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_orders_order_id (order_id),
     UNIQUE KEY uq_orders_checkout_session_id (checkout_session_id),
     KEY idx_orders_payment_status (payment_status),
     KEY idx_orders_created_at (created_at)
