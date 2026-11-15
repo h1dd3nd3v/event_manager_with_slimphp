@@ -102,7 +102,7 @@ All request and response bodies are JSON except event image uploads, which use `
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/events` | Create an event with `event_name`, `start_date`, `end_date`, `location`, `event_registration_link`, and `event_created_by`. Dates use `YYYY-MM-DD`. An optional `title_image` file is uploaded to Cloudinary. |
-| `GET` | `/events` | List events. |
+| `GET` | `/events?page=1&per_page=20` | List events. `page` defaults to 1; `per_page` defaults to 20 and is capped at 100. The response includes pagination metadata (`current_page`, `per_page`, `total`, and `last_page`). |
 | `GET` | `/events/{event_id}` | Retrieve an event. |
 | `DELETE` | `/events/{event_id}` | Delete an event. |
 | `POST` | `/events/{event_id}` | Update event details. |
