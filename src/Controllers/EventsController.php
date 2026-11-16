@@ -182,16 +182,16 @@ class EventsController
 
         try {
             $events = EventsModel::select([
-                    "id",
-                    "event_name",
-                    "start_date",
-                    "end_date",
-                    "location",
-                    "event_registration_link",
-                    "event_created_by",
-                    "event_updated_by",
-                    "title_image_link"
-                ])
+                "id",
+                "event_name",
+                "start_date",
+                "end_date",
+                "location",
+                "event_registration_link",
+                "event_created_by",
+                "event_updated_by",
+                "title_image_link"
+            ])
                 ->orderByDesc("id")
                 ->paginate($per_page, ["*"], "page", $page);
 
@@ -307,7 +307,8 @@ class EventsController
     }
     public function update_event_details(Request $request, Response $response, array $args)
     {
-        $form_data = $request->getParsedBody();
+        $form_data = $request->getParsedBody() ?? [];
+        $uploaded_files = $request->getUploadedFiles();
 
         $event_id = $args['event_id'] ?? '';
 
@@ -376,6 +377,54 @@ class EventsController
                 throw new Exception("Event not found");
             }
 
+            $title_image_link = $event->title_image_link;
+            $image_file = $uploaded_files['title_image'] ?? null;
+
+            if ($image_file !== null && $image_file->getError() !== UPLOAD_ERR_NO_FILE) {
+                if ($image_file->getError() !== UPLOAD_ERR_OK) {
+                    $response->getBody()->write(json_encode([
+                        "errors" => true,
+                        "message" => "Image upload failed."
+                    ]));
+                    return $response->withHeader("Content-Type", "application/json")->withStatus(400);
+                }
+
+                if ($image_file->getSize() > 5 * 1024 * 1024) {
+                    $response->getBody()->write(json_encode([
+                        "errors" => true,
+                        "message" => "Image size must not exceed 5MB."
+                    ]));
+                    return $response->withHeader("Content-Type", "application/json")->withStatus(400);
+                }
+
+                $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+                if (!in_array($image_file->getClientMediaType(), $allowed_types, true)) {
+                    $response->getBody()->write(json_encode([
+                        "errors" => true,
+                        "message" => "Only JPG, PNG and WEBP images are allowed."
+                    ]));
+                    return $response->withHeader("Content-Type", "application/json")->withStatus(400);
+                }
+
+                $image_utilities = new ImageUtilities;
+                $uploaded_image_link = $image_utilities->upload_image($image_file);
+
+                if (!is_string($uploaded_image_link) || $uploaded_image_link === '') {
+                    $upload_error = is_array($uploaded_image_link)
+                        ? ($uploaded_image_link['errorMessage'] ?? 'Unknown upload error')
+                        : 'The image utility returned an invalid URL';
+                    error_log("Event image upload error: " . $upload_error);
+
+                    $response->getBody()->write(json_encode([
+                        "errors" => true,
+                        "message" => "Unable to upload event image."
+                    ]));
+                    return $response->withHeader("Content-Type", "application/json")->withStatus(500);
+                }
+
+                $title_image_link = $uploaded_image_link;
+            }
+
             EventsModel::where("id", "=", $event_id)
                 ->update([
                     "event_name" => $event_name,
@@ -384,7 +433,7 @@ class EventsController
                     "location" => $location,
                     "event_registration_link" => $event_registration_link,
                     "event_created_by" => $event_created_by,
-                    "title_image_link" => "https://www.google.com"
+                    "title_image_link" => $title_image_link
                 ]);
 
             $response->getBody()->write(json_encode([
