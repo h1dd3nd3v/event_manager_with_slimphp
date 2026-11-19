@@ -55,8 +55,9 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
    - `stripe_events`: use the Stripe event-log table definition for this project. It must include the fields used by `StripeEventsModel`, including a unique `stripe_event_id`, `checkout_session_id`, `payment_status`, `payload` (JSON), `stripe_created_at`, `processing_status`, `processed_at`, and `attempts`. The model disables Eloquent timestamps, so `created_at` and `updated_at` are not required for this table.
    - `orders`: execute [`database/orders.sql`](./database/orders.sql) once to create the book order table.
    - `publishing_entries`: execute [`database/publishing_entries.sql`](./database/publishing_entries.sql) once to create the publishing file catalog.
+   - `royal_honorees`: execute [`database/royal_honorees.sql`](./database/royal_honorees.sql) once to create the royal honorees catalog.
 
-   Database schema creation is not automated by migrations. Ensure the `stripe_events`, `orders`, and `publishing_entries` tables exist before using their respective endpoints.
+   Database schema creation is not automated by migrations. Ensure the `stripe_events`, `orders`, `publishing_entries`, and `royal_honorees` tables exist before using their respective endpoints.
    For an existing `publishing_entries` table, execute [`database/publishing_display_image.sql`](./database/publishing_display_image.sql) once to add optional display-image fields.
    For an existing `publishing_entries` table, execute [`database/publishing_name.sql`](./database/publishing_name.sql) once to add and populate the required name field.
 
@@ -91,7 +92,7 @@ For Render, create a Blueprint from this repository using `render.yaml`. Set the
 
 ## API
 
-All request and response bodies are JSON except event image and publishing file uploads, which use `multipart/form-data`.
+All request and response bodies are JSON except event image, publishing file, and honoree profile-image uploads, which use `multipart/form-data`.
 
 ### Users
 
@@ -110,6 +111,18 @@ All request and response bodies are JSON except event image and publishing file 
 | `DELETE` | `/events/{event_id}` | Delete an event. |
 | `POST` | `/events/{event_id}` | Update event details. |
 | `POST` | `/events/image/{event_id}` | Update an event image. |
+
+### Royal honorees
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/royal-honorees?page=1&per_page=20` | Publicly list honorees with pagination. `per_page` defaults to 20 and is capped at 100. |
+| `GET` | `/royal-honorees/{honoree_id}` | Publicly retrieve an honoree by ID. |
+| `POST` | `/royal-honorees` | Create an honoree with `name`, `titles` (JSON array), `bio`, optional `social_links` (JSON object), and optional `profile_image` upload. Requires a login token. |
+| `POST` | `/royal-honorees/{honoree_id}` | Update honoree fields; `profile_image` may be uploaded to replace the current image. Requires a login token. |
+| `DELETE` | `/royal-honorees/{honoree_id}` | Delete an honoree. Requires a login token. |
+
+For multipart requests, send `titles` and `social_links` as JSON strings. Social-link values must be valid HTTP or HTTPS URLs. Profile images use the existing Cloudinary image upload utility.
 
 ### Publishing
 
