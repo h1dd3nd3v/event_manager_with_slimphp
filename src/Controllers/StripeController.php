@@ -172,10 +172,12 @@ class StripeController
                     'livemode',
                     'checkout_session_id',
                     'payment_intent_id',
+                    'customer_email',
                     'amount_total',
                     'currency',
                     'payment_status',
                     'stripe_created_at',
+                    'received_at',
                     'processing_status',
                 ])
                 ->whereNotNull('checkout_session_id')

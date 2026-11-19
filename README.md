@@ -1,14 +1,14 @@
 # MySankofa Event Manager API
 
-A PHP API built with Slim 4. It provides user registration/login, event management, image uploads to Cloudinary, and Stripe Checkout session creation and record lookup.
+A PHP API built with Slim 4. It provides user registration/login, event management, publishing file uploads to Cloudinary, and Stripe Checkout session creation and record lookup.
 
 ## Requirements
 
-- PHP with the extensions required by Composer, including `pdo_mysql` when using MySQL
+- PHP with the extensions required by Composer, including `pdo_mysql` when using MySQL and `fileinfo`/`zip` for publishing uploads
 - Composer
 - MySQL or another database supported by Illuminate Database
 - Stripe account and API keys for Checkout
-- Cloudinary account credentials for event image uploads
+- Cloudinary account credentials for event image and publishing file uploads
 - Apache with URL rewriting enabled, or an equivalent web-server configuration
 
 ## Setup
@@ -54,8 +54,11 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
    - `events`: `id`, `event_name`, `start_date`, `end_date`, `location`, `event_registration_link`, `event_created_by`, `event_updated_by`, `title_image_link`, `created_at`, and `updated_at`.
    - `stripe_events`: use the Stripe event-log table definition for this project. It must include the fields used by `StripeEventsModel`, including a unique `stripe_event_id`, `checkout_session_id`, `payment_status`, `payload` (JSON), `stripe_created_at`, `processing_status`, `processed_at`, and `attempts`. The model disables Eloquent timestamps, so `created_at` and `updated_at` are not required for this table.
    - `orders`: execute [`database/orders.sql`](./database/orders.sql) once to create the book order table.
+   - `publishing_entries`: execute [`database/publishing_entries.sql`](./database/publishing_entries.sql) once to create the publishing file catalog.
 
-   Database schema creation is not automated by migrations. Ensure the `stripe_events` and `orders` tables exist before using checkout or order endpoints.
+   Database schema creation is not automated by migrations. Ensure the `stripe_events`, `orders`, and `publishing_entries` tables exist before using their respective endpoints.
+   For an existing `publishing_entries` table, execute [`database/publishing_display_image.sql`](./database/publishing_display_image.sql) once to add optional display-image fields.
+   For an existing `publishing_entries` table, execute [`database/publishing_name.sql`](./database/publishing_name.sql) once to add and populate the required name field.
 
 4. Configure the web server to route requests to `public/index.php`. The project includes a root `.htaccess` that forwards requests into `public/`; enable Apache rewrite support and confirm the hosting document-root configuration matches your deployment.
 
@@ -88,7 +91,7 @@ For Render, create a Blueprint from this repository using `render.yaml`. Set the
 
 ## API
 
-All request and response bodies are JSON except event image uploads, which use `multipart/form-data`.
+All request and response bodies are JSON except event image and publishing file uploads, which use `multipart/form-data`.
 
 ### Users
 
@@ -108,13 +111,27 @@ All request and response bodies are JSON except event image uploads, which use `
 | `POST` | `/events/{event_id}` | Update event details. |
 | `POST` | `/events/image/{event_id}` | Update an event image. |
 
+### Publishing
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/publishing` | Upload one `file` (up to 500 MB), provide a `name`, and optionally upload a `display_image` (JPG, PNG, GIF, or WEBP up to 5 MB) using `multipart/form-data`; save their details and return the new entry. Requires a login token. |
+| `GET` | `/publishing?page=1&per_page=20` | Publicly list publishing entries with pagination. `per_page` defaults to 20 and is capped at 100. |
+| `GET` | `/publishing/{publishing_id}` | Publicly retrieve a publishing entry by its numeric ID. |
+| `POST` | `/publishing/{publishing_id}` | Replace an entry's file using the `file` field in `multipart/form-data`. Optionally change its `name` and/or replace its display image with the `display_image` field; omitting either keeps its current value. Requires a login token. |
+| `DELETE` | `/publishing/{publishing_id}` | Delete an entry and attempt to remove its Cloudinary asset. The response indicates whether Cloudinary cleanup succeeded. Requires a login token. |
+
+Documents and e-books are stored as Cloudinary `raw` assets; videos are stored as Cloudinary `video` assets; display images are stored as Cloudinary `image` assets. Supported video extensions are 3G2, 3GP, AVI, FLV, M4V, MKV, MOV, MP4, MPEG, MPG, OGV, WebM, and WMV. Upload endpoints validate the file extension and detected MIME type, and check DOCX, EPUB, and MOBI-family file structure before upload.
+
+The Docker image configures PHP to accept 500 MB uploads. For non-Docker deployments, configure `upload_max_filesize=500M`, `post_max_size=510M`, `max_execution_time=600`, and `max_input_time=600` in PHP.
+
 ### Stripe Checkout
 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/checkout/create-checkout-session` | Create a one-time Stripe Checkout session, save its snapshot in `stripe_events`, and return `{ "url": "..." }`. |
 | `GET` | `/checkout/checkout-session?session_id=cs_test_...` | Read a saved Checkout Session by ID. Returns status, payment status, amount, and currency. Returns `404` if no saved record exists. |
-| `GET` | `/checkout/checkout-events?page=1&per_page=20` | Return paginated Checkout records, excluding the raw Stripe payload and customer email. `per_page` defaults to 20 and is capped at 100. |
+| `GET` | `/checkout/checkout-events?page=1&per_page=20` | Return paginated Checkout records, including customer email and timestamps but excluding the raw Stripe payload. `per_page` defaults to 20 and is capped at 100. |
 | `POST` | `/checkout/webhook` | Receive and verify Stripe Checkout payment events. Configure Stripe to send `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired` to this endpoint. |
 
 ### Book orders

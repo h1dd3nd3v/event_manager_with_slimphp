@@ -18,6 +18,9 @@ RUN apt-get update && apt-get install -y \
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Allow publishing uploads up to 500 MB.
+COPY docker/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 # Copy project files
 COPY . .
 
