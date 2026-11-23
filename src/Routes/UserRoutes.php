@@ -14,5 +14,7 @@ return function (App $app) {
         $group->post('', [UsersController::class, 'create_user'])
             ->add(new AuthMiddleware());
         $group->post('/login', [UsersController::class, 'login_user']);
+        $group->get('/me', [UsersController::class, 'get_current_user'])
+            ->add(new AuthMiddleware());
     });
 };

@@ -140,6 +140,29 @@ class UsersController
         return $response->withHeader("Content-Type", "application/json")->withStatus(200);
     }
 
+    public function get_current_user(Request $request, Response $response)
+    {
+        $user = $request->getAttribute('user');
+
+        if (!$user instanceof UsersModel) {
+            $response->getBody()->write(json_encode([
+                "errors" => true,
+                "message" => "Unauthorized"
+            ]));
+            return $response->withHeader("Content-Type", "application/json")->withStatus(401);
+        }
+
+        $response->getBody()->write(json_encode([
+            "success" => true,
+            "user" => [
+                "id" => $user->id,
+                "username" => $user->username,
+                "email" => $user->email,
+            ]
+        ]));
+        return $response->withHeader("Content-Type", "application/json")->withStatus(200);
+    }
+
     public function update_password(Request $request, Response $response)
     {
 

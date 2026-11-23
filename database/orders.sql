@@ -2,7 +2,7 @@ CREATE TABLE orders (
     id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     order_id            CHAR(32)       NOT NULL,
     product_name        VARCHAR(255)   NOT NULL,
-    product_format      ENUM('ebook', 'hardcover') NOT NULL,
+    product_format      ENUM('ebook', 'hardcover', 'paperback') NOT NULL,
     amount_total        INT UNSIGNED   NULL COMMENT 'Smallest currency unit',
     currency            CHAR(3)        NULL,
     customer_email      VARCHAR(255)   NULL,

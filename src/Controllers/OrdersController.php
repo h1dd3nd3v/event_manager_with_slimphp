@@ -14,21 +14,83 @@ use Throwable;
 class OrdersController
 {
     private const BOOK_TITLE = 'ABENA: Walk Proudly in Your Identity';
+    private const PART_TWO_PAPERBACK_TITLE = 'ABENA Part Two: Character Before Crowns - Paperback';
+
+    public function create_ebook_checkout_session(Request $request, Response $response): Response
+    {
+        return $this->createCheckoutSession(
+            $response,
+            'ebook',
+            self::BOOK_TITLE . ' (Ebook)',
+            'STRIPE_EBOOK_PRICE_ID',
+            true
+        );
+    }
+
+    public function create_hardcover_checkout_session(Request $request, Response $response): Response
+    {
+        return $this->createCheckoutSession(
+            $response,
+            'hardcover',
+            self::BOOK_TITLE . ' (Hardcover)',
+            'STRIPE_HARDCOVER_PRICE_ID',
+            true
+        );
+    }
+
+    public function create_paperback_checkout_session(Request $request, Response $response): Response
+    {
+        return $this->createCheckoutSession(
+            $response,
+            'paperback',
+            self::PART_TWO_PAPERBACK_TITLE,
+            'STRIPE_ABENA_PART_TWO_PAPERBACK_PRICE_ID',
+            true
+        );
+    }
 
     public function create_order(Request $request, Response $response): Response
     {
         $body = $request->getParsedBody();
         $format = is_array($body) ? ($body['format'] ?? null) : null;
 
-        if (!is_string($format) || !in_array($format, ['ebook', 'hardcover'], true)) {
+        if (!is_string($format) || !in_array($format, ['ebook', 'hardcover', 'paperback'], true)) {
             return $this->jsonResponse($response, [
-                'error' => 'format must be either "ebook" or "hardcover".',
+                'error' => 'format must be "ebook", "hardcover", or "paperback".',
             ], 400);
         }
 
-        $priceVariable = $format === 'ebook'
-            ? 'STRIPE_EBOOK_PRICE_ID'
-            : 'STRIPE_HARDCOVER_PRICE_ID';
+        $products = [
+            'ebook' => [
+                'title' => self::BOOK_TITLE . ' (Ebook)',
+                'price_variable' => 'STRIPE_EBOOK_PRICE_ID',
+            ],
+            'hardcover' => [
+                'title' => self::BOOK_TITLE . ' (Hardcover)',
+                'price_variable' => 'STRIPE_HARDCOVER_PRICE_ID',
+            ],
+            'paperback' => [
+                'title' => self::PART_TWO_PAPERBACK_TITLE,
+                'price_variable' => 'STRIPE_ABENA_PART_TWO_PAPERBACK_PRICE_ID',
+            ],
+        ];
+
+        return $this->createCheckoutSession(
+            $response,
+            $format,
+            $products[$format]['title'],
+            $products[$format]['price_variable'],
+            false
+        );
+    }
+
+    private function createCheckoutSession(
+        Response $response,
+        string $format,
+        string $productName,
+        string $priceVariable,
+        bool $redirect
+    ): Response {
         $requiredVariables = [
             'STRIPE_SECRET_KEY',
             $priceVariable,
@@ -57,7 +119,6 @@ class OrdersController
 
         try {
             $orderId = bin2hex(random_bytes(16));
-            $productName = self::BOOK_TITLE . ' (' . ucfirst($format) . ')';
             $order = OrdersModel::create([
                 'order_id' => $orderId,
                 'product_name' => $productName,
@@ -81,7 +142,7 @@ class OrdersController
                 'cancel_url' => $domain . '/checkout/cancelled',
             ];
 
-            if ($format === 'hardcover') {
+            if (in_array($format, ['hardcover', 'paperback'], true)) {
                 $sessionParameters['shipping_address_collection'] = [
                     'allowed_countries' => ShippingCountries::allowed(),
                 ];
@@ -100,6 +161,12 @@ class OrdersController
             $order->amount_total = $session->amount_total;
             $order->currency = $session->currency;
             $order->save();
+
+            if ($redirect) {
+                return $response
+                    ->withHeader('Location', $session->url)
+                    ->withStatus(303);
+            }
 
             return $this->jsonResponse($response, [
                 'orderId' => $order->order_id,

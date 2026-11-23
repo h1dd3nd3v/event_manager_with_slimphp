@@ -18,6 +18,7 @@ $app->add(function (Request $request, $handler): Response {
 
     $allowedOrigins = [
         'http://localhost:5173',
+        'http://localhost:5174',
 
         // Local network
         // 'http://100.115.149.56:5173',
@@ -25,7 +26,8 @@ $app->add(function (Request $request, $handler): Response {
         // 'http://10.195.128.9',
 
         // Replace with your deployed frontend
-        'https://adminconsole.mysankofa.com',
+        'https://adminconsole.mysankofa.org',
+        'https://wwww.mysankofa.org'
     ];
 
     $origin = $request->getHeaderLine('Origin');

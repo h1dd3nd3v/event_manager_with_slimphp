@@ -41,6 +41,7 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
    STRIPE_PRICE_ID=price_replace_me
    STRIPE_EBOOK_PRICE_ID=price_replace_me
    STRIPE_HARDCOVER_PRICE_ID=price_replace_me
+   STRIPE_ABENA_PART_TWO_PAPERBACK_PRICE_ID=price_replace_me
    STRIPE_WEBHOOK_SECRET=whsec_replace_me
    DOMAIN=http://localhost:5173
    APP_DEBUG=false
@@ -58,6 +59,7 @@ A PHP API built with Slim 4. It provides user registration/login, event manageme
    - `royal_honorees`: execute [`database/royal_honorees.sql`](./database/royal_honorees.sql) once to create the royal honorees catalog.
 
    Database schema creation is not automated by migrations. Ensure the `stripe_events`, `orders`, `publishing_entries`, and `royal_honorees` tables exist before using their respective endpoints.
+   For an existing `orders` table, execute [`database/orders_paperback.sql`](./database/orders_paperback.sql) once to allow paperback orders.
    For an existing `publishing_entries` table, execute [`database/publishing_display_image.sql`](./database/publishing_display_image.sql) once to add optional display-image fields.
    For an existing `publishing_entries` table, execute [`database/publishing_name.sql`](./database/publishing_name.sql) once to add and populate the required name field.
 
@@ -83,7 +85,7 @@ For Render, create a Blueprint from this repository using `render.yaml`. Set the
 | `DB_DRIVER`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_CHARSET`, `DB_COLLATION` | Database connection configured in `src/database.php` |
 | `STRIPE_SECRET_KEY` | Stripe API requests |
 | `STRIPE_PRICE_ID` | The Price used to create each Checkout session |
-| `STRIPE_EBOOK_PRICE_ID`, `STRIPE_HARDCOVER_PRICE_ID` | Stripe Price IDs for the book's ebook and hardcover options |
+| `STRIPE_EBOOK_PRICE_ID`, `STRIPE_HARDCOVER_PRICE_ID`, `STRIPE_ABENA_PART_TWO_PAPERBACK_PRICE_ID` | Stripe Price IDs for ABENA ebook and hardcover, and the ABENA Part Two paperback |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for the Stripe webhook endpoint; keep it private |
 | `DOMAIN` | Checkout success and cancellation URL base |
 | `APP_DEBUG` | When true, includes Stripe exception details in Stripe error responses |
@@ -100,6 +102,7 @@ All request and response bodies are JSON except event image, publishing file, an
 |---|---|---|
 | `POST` | `/users` | Register a user. The request expects `first_name`, `last_name`, `username`, `email`, and `password`. |
 | `POST` | `/users/login` | Check a username and password; returns an `access_token`, `token_type` (`Bearer`), and `expires_in` (seconds). |
+| `GET` | `/users/me` | Validate the login token and return the authenticated user's `id`, `username`, and `email`. Requires a login token. |
 
 ### Events
 
@@ -151,12 +154,36 @@ The Docker image configures PHP to accept 500 MB uploads. For non-Docker deploym
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/orders` | Create a guest order and Stripe Checkout session. JSON body: `{ "format": "ebook" }` or `{ "format": "hardcover" }`. Returns `orderId`, `sessionId`, and the Checkout `url`. Hardcover checkout collects a shipping address using the existing allowed-country list; shipping is included in the configured Stripe Price. |
+| `POST` | `/orders` | Create a guest order and Stripe Checkout session. JSON body: `{ "format": "ebook" }`, `{ "format": "hardcover" }`, or `{ "format": "paperback" }`. Returns `orderId`, `sessionId`, and the Checkout `url`. Hardcover and paperback checkouts collect a shipping address using the existing allowed-country list; shipping is included in the configured Stripe Price. |
+| `GET` | `/orders/checkout/abena-ebook` | Create an ABENA ebook order and redirect the browser to Stripe Checkout. |
+| `GET` | `/orders/checkout/abena-hardcover` | Create an ABENA hardcover order, collect a shipping address, and redirect the browser to Stripe Checkout. |
+| `GET` | `/orders/checkout/abena-part-two-paperback` | Create an ABENA Part Two paperback order, collect a shipping address, and redirect the browser to Stripe Checkout. |
 | `GET` | `/orders?page=1&per_page=20` | List orders. Requires a login token. |
 | `GET` | `/orders/{order_id}` | Retrieve an order. Requires a login token. |
 | `PATCH` | `/orders/{order_id}/fulfillment` | Set `{ "fulfillment_status": "processing" }`, `"shipped"`, or `"fulfilled"` after payment. Requires a login token. |
 
-Order payment status is set to `paid` only after a verified Stripe webhook confirms payment. E-book fulfillment is manual and can be marked `fulfilled`; hardcover orders can be marked `processing`, `shipped`, then `fulfilled`.
+Frontend POST request template:
+
+```js
+const response = await fetch("https://<api-base-url>/orders", {
+  method: "POST",
+  headers: {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ format: "hardcover" }), // "ebook", "hardcover", or "paperback"
+});
+
+const data = await response.json();
+if (!response.ok) {
+  throw new Error(data.error || "Unable to create the order checkout.");
+}
+
+// The response also includes orderId and sessionId.
+window.location.assign(data.url);
+```
+
+The POST `/orders` format accepts `ebook`, `hardcover`, or `paperback`. Payment status is set to `paid` only after a verified Stripe webhook confirms payment. E-book fulfillment is manual and can be marked `fulfilled`; hardcover and paperback orders can be marked `processing`, `shipped`, then `fulfilled`.
 
 The current order-management routes use the existing JWT middleware, so **any authenticated account can list and manage all orders**. This includes customer email and shipping-address data. Restrict these routes to administrators before production use.
 

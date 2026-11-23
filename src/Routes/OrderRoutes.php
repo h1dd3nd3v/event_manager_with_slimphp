@@ -12,6 +12,12 @@ use Slim\Routing\RouteCollectorProxy;
 return function (App $app): void {
     $app->group('/orders', function (RouteCollectorProxy $group): void {
         $group->post('', [OrdersController::class, 'create_order']);
+        $group->get('/checkout/abena-ebook', [OrdersController::class, 'create_ebook_checkout_session']);
+        $group->get('/checkout/abena-hardcover', [OrdersController::class, 'create_hardcover_checkout_session']);
+        $group->get(
+            '/checkout/abena-part-two-paperback',
+            [OrdersController::class, 'create_paperback_checkout_session']
+        );
         $group->get('', [OrdersController::class, 'list_orders'])
             ->add(new AuthMiddleware());
         $group->get('/{order_id}', [OrdersController::class, 'get_order'])

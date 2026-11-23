@@ -11,7 +11,6 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Response as SlimResponse;
-use UnexpectedValueException;
 
 class AuthMiddleware implements MiddlewareInterface
 {
@@ -25,7 +24,7 @@ class AuthMiddleware implements MiddlewareInterface
 
         try {
             $claims = JwtToken::decode($matches[1]);
-        } catch (UnexpectedValueException) {
+        } catch (\Throwable) {
             return $this->unauthorized();
         }
 
