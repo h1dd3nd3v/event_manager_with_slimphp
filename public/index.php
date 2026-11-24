@@ -27,7 +27,8 @@ $app->add(function (Request $request, $handler): Response {
 
         // Replace with your deployed frontend
         'https://adminconsole.mysankofa.org',
-        'https://wwww.mysankofa.org'
+        'https://wwww.mysankofa.org',
+        'update2.mysankofa.org'
     ];
 
     $origin = $request->getHeaderLine('Origin');
